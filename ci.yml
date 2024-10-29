@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      docker:
+        image: docker:stable
+        options: --privileged
+        ports:
+          - 127.0.0.1:2375:2375
+        env:
+          DOCKER_HOST: tcp://localhost:2375
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Docker image
+        run: docker build -t my-app-image .
+
+      - name: Run Docker container
+        run: docker run --rm -d -p 3000:3000 my-app-image
+
+      - name: Lint and format code
+        run: npm run lint && npm run format
+
+      - name: Deploy (if necessary)
+        if: github.ref == 'refs/heads/main' && success()
+        run: |
+          echo "Déploiement de l'image Docker"
+          docker tag my-app-image my-docker-repo/my-app:latest
+          docker push my-docker-repo/my-app:latest
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
